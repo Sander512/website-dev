@@ -11,56 +11,111 @@
 </head>
 <body>
 
-<aside class="sidebar">
-  <div class="sidebar-brand">
-    <span class="brand-mark">⚡</span>
-    <span class="brand-name">Aurex</span>
-  </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#/" class="brand"><span class="brand-mark">⚡</span> AUREX</a>
 
-  <nav class="sidebar-nav">
-    <a href="#/" class="nav-link" data-view="shop">🛍️ Winkel</a>
-    <a href="#/cart" class="nav-link" data-view="cart">🛒 Winkelwagen <span id="cartCount" class="cart-count hidden">0</span></a>
-    <a id="joinBtn" href="#" target="_blank" rel="noopener" class="nav-link hidden">💬 Join Discord</a>
-  </nav>
+    <nav class="topnav">
+      <a href="#/" data-view="home">Home</a>
+      <a href="#/shop" data-view="shop">Shop</a>
+      <a id="joinBtn" href="#" target="_blank" rel="noopener" class="hidden">Discord</a>
+    </nav>
 
-  <div class="sidebar-user">
-    <div id="userBox" class="hidden">
-      <div id="userName" class="muted user-name"></div>
-      <button id="logoutBtn" class="btn btn-ghost btn-small btn-full">Uitloggen</button>
+    <div class="topbar-actions">
+      <a id="loginBtn" class="btn btn-discord btn-small hidden" href="#">Inloggen met Discord</a>
+      <div id="userBox" class="userbox hidden">
+        <span id="userAvatar" class="avatar"></span>
+        <span id="userName" class="user-name"></span>
+        <button id="logoutBtn" class="btn btn-ghost btn-small">Uitloggen</button>
+      </div>
+      <a href="#/cart" class="cart-link" aria-label="Winkelwagen">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
+        <span id="cartCount" class="cart-count hidden">0</span>
+      </a>
     </div>
-    <a id="loginBtn" class="btn btn-discord btn-full hidden" href="#">Inloggen met Discord</a>
   </div>
-</aside>
+</header>
 
-<div class="content">
+<main class="page">
   <div id="banner" class="shop-banner hidden"></div>
 
-  <section id="view-shop">
+  <!-- HOME -->
+  <section id="view-home">
     <div class="hero">
       <p class="hero-kicker">$ /product-add</p>
-      <h1>Nieuwe scripts en templates, direct uit Discord.</h1>
+      <h1>Scripts en templates<br />voor je Discord.</h1>
       <p class="hero-sub">
-        Kies wat je nodig hebt, reken veilig af via Stripe, en krijg automatisch een DM
+        Kies wat je nodig hebt, reken veilig af via Stripe en krijg automatisch een DM
         zodra er een nieuwe versie is van wat je gekocht hebt.
       </p>
+      <div class="hero-pills">
+        <span class="pill">Direct geleverd</span>
+        <span class="pill">Update-DM's</span>
+        <span class="pill">Veilig via Stripe</span>
+      </div>
+      <a href="#/shop" class="btn btn-primary hero-cta">Bekijk de shop</a>
     </div>
 
-    <h2 class="section-title">Producten</h2>
-    <div id="productGrid" class="product-grid"></div>
-    <p id="emptyState" class="muted hidden" style="text-align:center; margin-top:40px;"></p>
+    <div class="section-head">
+      <h2 class="section-title">Nieuwste producten</h2>
+      <a href="#/shop" class="link">Alles bekijken →</a>
+    </div>
+    <div id="homeGrid" class="product-grid"></div>
   </section>
 
+  <!-- SHOP -->
+  <section id="view-shop" class="hidden">
+    <div class="shop-head">
+      <h1 class="page-title">Shop</h1>
+      <div class="toolbar">
+        <select id="sortSelect" aria-label="Sorteren">
+          <option value="newest">Sorteer: nieuwste</option>
+          <option value="price-asc">Prijs: laag naar hoog</option>
+          <option value="price-desc">Prijs: hoog naar laag</option>
+          <option value="name">Naam A–Z</option>
+        </select>
+        <input id="searchInput" type="search" placeholder="Zoek producten..." />
+      </div>
+    </div>
+
+    <div class="shop-layout">
+      <aside class="filters">
+        <h3 class="filters-title">Categorieën</h3>
+        <div id="categoryList" class="category-list"></div>
+
+        <h3 class="filters-title">Maximale prijs</h3>
+        <input id="priceRange" type="range" min="0" max="100" value="100" />
+        <div class="price-labels"><span>€0</span><span id="priceMaxLabel">€100</span></div>
+      </aside>
+
+      <div>
+        <p id="resultCount" class="muted result-count"></p>
+        <div id="productGrid" class="product-grid"></div>
+        <p id="emptyState" class="muted hidden empty">Geen producten gevonden.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCT -->
+  <section id="view-product" class="hidden">
+    <a href="#/shop" class="link back-link">← Terug naar de shop</a>
+    <div id="productDetail"></div>
+  </section>
+
+  <!-- CART -->
   <section id="view-cart" class="hidden">
-    <h2 class="section-title" style="margin-top:0;">Winkelwagen</h2>
+    <h1 class="page-title">Winkelwagen</h1>
     <div id="cartList" class="cart-list"></div>
     <div id="cartFooter" class="cart-footer hidden">
       <div class="cart-total"><span class="muted">Totaal</span> <strong id="cartTotal"></strong></div>
       <button id="checkoutBtn" class="btn btn-primary">Afrekenen</button>
       <a id="checkoutLogin" class="btn btn-discord hidden" href="#">Log in om af te rekenen</a>
     </div>
-    <p id="cartEmpty" class="muted hidden">Je winkelwagen is leeg. <a href="#/" class="link">Bekijk de winkel</a>.</p>
+    <p id="cartEmpty" class="muted hidden">Je winkelwagen is leeg. <a href="#/shop" class="link">Bekijk de shop</a>.</p>
   </section>
-</div>
+</main>
+
+<footer class="footer">© Aurex | Development</footer>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
