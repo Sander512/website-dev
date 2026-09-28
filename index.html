@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aurex | Development — Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="shop-topbar">
+  <div class="shop-wrap shop-topbar-inner">
+    <div class="shop-brand">
+      <span class="brand-mark">⚡</span>
+      <span class="brand-name">Aurex</span>
+    </div>
+
+    <div id="userBox" class="shop-userbox hidden">
+      <span id="userName" class="muted"></span>
+      <button id="logoutBtn" class="btn btn-ghost btn-small">Uitloggen</button>
+    </div>
+    <a id="loginBtn" class="btn btn-discord btn-small hidden" href="#">Inloggen met Discord</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="shop-wrap hero-inner">
+    <div class="hero-copy">
+      <p class="hero-kicker">$ /product-add</p>
+      <h1>Voeg een product toe in Discord.<br />Het staat meteen in de shop.</h1>
+      <p class="hero-sub">
+        Beheer je scripts en templates rechtstreeks vanuit Discord met <code>/product-add</code> —
+        nieuwe producten en versies verschijnen direct hieronder, kopers betalen veilig via Stripe,
+        en krijgen automatisch een DM zodra je op "Stuur update" klikt.
+      </p>
+      <a href="#producten" class="btn btn-primary">Bekijk producten</a>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="mock-card mock-discord">
+        <div class="mock-line mock-cmd">/product-add</div>
+        <div class="mock-line mock-field"><span>naam</span>Ticket Suite Pro</div>
+        <div class="mock-line mock-field"><span>prijs</span>24.99</div>
+        <div class="mock-line mock-result">✓ Toegevoegd — nu live op de shop</div>
+      </div>
+      <div class="mock-arrow">→</div>
+      <div class="mock-card mock-product">
+        <div class="mock-product-name">Ticket Suite Pro</div>
+        <span class="mock-product-version">v1.0.0</span>
+        <div class="mock-product-price">€24,99</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="shop-wrap features-inner">
+    <div class="feature">
+      <span class="feature-icon">⚡</span>
+      <h3>Automatisch gesynchroniseerd</h3>
+      <p>Product via <code>/product-add</code> of het dashboard toegevoegd? Het staat meteen live, zonder aparte upload.</p>
+    </div>
+    <div class="feature">
+      <span class="feature-icon">🔔</span>
+      <h3>Update-DM's</h3>
+      <p>Eén klik op "Stuur update" en iedereen die het product kocht krijgt een DM met de nieuwe versie.</p>
+    </div>
+    <div class="feature">
+      <span class="feature-icon">🔒</span>
+      <h3>Veilig afrekenen</h3>
+      <p>Betalingen lopen via Stripe Checkout — kaartgegevens komen nooit bij ons of bij de bot terecht.</p>
+    </div>
+  </div>
+</section>
+
+<main class="shop-wrap" id="producten">
+  <h2 class="section-title">Producten</h2>
+
+  <div id="banner" class="shop-banner hidden"></div>
+
+  <div id="productGrid" class="product-grid"></div>
+  <p id="emptyState" class="muted hidden" style="text-align:center; margin-top:40px;"></p>
+</main>
+
+<footer class="shop-footer">
+  <div class="shop-wrap">
+    <span class="muted">© Aurex | Development</span>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
