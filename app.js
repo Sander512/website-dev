@@ -34,6 +34,7 @@ function loginUrl() {
 }
 
 function formatPrice(cents, currency) {
+  if (cents === 0) return 'Gratis';
   return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
 }
 
@@ -150,7 +151,7 @@ function productCard(p) {
   if (isOwned(p.id)) {
     foot.appendChild(el('span', 'owned-badge', '✅ Al gekocht'));
   } else {
-    const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : 'In winkelwagen');
+    const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : (p.priceCents === 0 ? 'Gratis ophalen' : 'In winkelwagen'));
     btn.addEventListener('click', () => toggleCart(p.id));
     foot.appendChild(btn);
   }
@@ -277,8 +278,11 @@ function renderProduct(id) {
   const actions = el('div', 'detail-actions');
   if (isOwned(p.id)) {
     actions.appendChild(el('span', 'owned-badge', '✅ Al gekocht'));
+    const dl = el('a', 'btn btn-light', 'Download bestand');
+    dl.href = `${API_BASE}/store/download/${encodeURIComponent(p.id)}`;
+    actions.appendChild(dl);
   } else {
-    const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : 'In winkelwagen');
+    const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : (p.priceCents === 0 ? 'Gratis ophalen' : 'In winkelwagen'));
     btn.addEventListener('click', () => toggleCart(p.id));
     actions.appendChild(btn);
   }
@@ -338,6 +342,7 @@ function renderCart() {
   } else {
     $('cartTotal').textContent = formatPrice(items.reduce((s, p) => s + p.priceCents, 0), items[0].currency);
   }
+  $('checkoutBtn').textContent = items.every((p) => p.priceCents === 0) ? 'Gratis ophalen' : 'Afrekenen';
   $('checkoutBtn').disabled = mixed;
   $('checkoutBtn').classList.toggle('hidden', !state.user);
   $('checkoutLogin').classList.toggle('hidden', !!state.user);
@@ -378,8 +383,20 @@ $('checkoutBtn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Even geduld...';
   try {
-    const { url } = await api('POST', '/store/checkout', { productIds: ids });
-    window.location.href = url;
+    const result = await api('POST', '/store/checkout', { productIds: ids });
+    if (result.url) {
+      window.location.href = result.url;
+      return;
+    }
+    // Alleen gratis producten: direct afgehandeld, bestand komt per DM.
+    state.cart = state.cart.filter((id) => !ids.includes(id));
+    saveCart();
+    try { ({ productIds: state.ownedIds } = await api('GET', `/store/my-purchases/${state.guildId}`)); } catch { /* laat staan */ }
+    showBanner('Gelukt! Je bestand is onderweg per privébericht (DM) van de Aurex-bot. Kom je niets binnen, controleer dan of je DM\'s van serverleden hebt toegestaan — je kunt het bestand ook hier downloaden.', 'success');
+    btn.disabled = false;
+    btn.textContent = 'Afrekenen';
+    location.hash = '#/shop';
+    render();
   } catch (err) {
     showBanner(err.message, 'error');
     btn.disabled = false;
