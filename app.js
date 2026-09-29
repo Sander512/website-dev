@@ -12,6 +12,7 @@ const state = {
   user: null,
   products: [], // nieuwste eerst
   ownedIds: [],
+  orders: null,
   cart: loadCart(),
   filter: { category: null, maxPrice: null, search: '', sort: 'newest' },
 };
@@ -149,7 +150,12 @@ function productCard(p) {
 
   const foot = el('div', 'product-foot');
   if (isOwned(p.id)) {
-    foot.appendChild(el('span', 'owned-badge', '✅ Al gekocht'));
+    const row = el('div', 'owned-row');
+    row.appendChild(el('span', 'owned-pill', '✓ Gekocht'));
+    const dl = el('a', 'btn btn-light btn-small', 'Download');
+    dl.href = `${API_BASE}/store/download/${encodeURIComponent(p.id)}`;
+    row.appendChild(dl);
+    foot.appendChild(row);
   } else {
     const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : (p.priceCents === 0 ? 'Gratis ophalen' : 'In winkelwagen'));
     btn.addEventListener('click', () => toggleCart(p.id));
@@ -277,10 +283,12 @@ function renderProduct(id) {
 
   const actions = el('div', 'detail-actions');
   if (isOwned(p.id)) {
-    actions.appendChild(el('span', 'owned-badge', '✅ Al gekocht'));
+    const row = el('div', 'owned-row');
+    row.appendChild(el('span', 'owned-pill', '✓ Al gekocht'));
     const dl = el('a', 'btn btn-light', 'Download bestand');
     dl.href = `${API_BASE}/store/download/${encodeURIComponent(p.id)}`;
-    actions.appendChild(dl);
+    row.appendChild(dl);
+    actions.appendChild(row);
   } else {
     const btn = el('button', inCart(p.id) ? 'btn btn-outline' : 'btn btn-light', inCart(p.id) ? '✓ In wagen — verwijder' : (p.priceCents === 0 ? 'Gratis ophalen' : 'In winkelwagen'));
     btn.addEventListener('click', () => toggleCart(p.id));
@@ -303,6 +311,65 @@ function renderProduct(id) {
 
   wrap.appendChild(info);
   box.appendChild(wrap);
+}
+
+function orderDateLabel(ms) {
+  return new Date(ms).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+async function renderAccount() {
+  const list = $('accountList');
+  list.textContent = '';
+  $('accountEmpty').classList.add('hidden');
+
+  if (!state.user) {
+    location.hash = '#/';
+    return;
+  }
+
+  if (state.orders === null) {
+    list.appendChild(el('p', 'muted', 'Laden...'));
+    try {
+      ({ orders: state.orders } = await api('GET', `/store/my-orders/${state.guildId}`));
+    } catch (err) {
+      list.textContent = '';
+      list.appendChild(el('p', 'muted', `Kon je aankopen niet laden: ${err.message}`));
+      return;
+    }
+    list.textContent = '';
+  }
+
+  if (state.orders.length === 0) {
+    $('accountEmpty').classList.remove('hidden');
+    return;
+  }
+
+  state.orders.forEach((o) => {
+    const row = el('div', 'order-item');
+
+    const thumb = el('div', 'order-thumb');
+    thumb.appendChild(o.imageUrl ? imageEl(o.imageUrl, o.name) : placeholder(o.name));
+    row.appendChild(thumb);
+
+    const info = el('div', 'order-info');
+    info.appendChild(el('div', 'order-name', o.name));
+    const metaBits = [orderDateLabel(o.purchasedAt)];
+    if (o.version) metaBits.push(`v${o.version}`);
+    metaBits.push(o.paidCents === 0 ? 'Gratis' : formatPrice(o.paidCents, o.currency));
+    if (!o.stillListed) metaBits.push('niet meer in de shop');
+    info.appendChild(el('div', 'muted order-meta', metaBits.join(' · ')));
+    row.appendChild(info);
+
+    if (o.hasFile) {
+      const dl = el('a', 'btn btn-light btn-small', 'Download');
+      dl.href = `${API_BASE}/store/download/${encodeURIComponent(o.id)}`;
+      row.appendChild(dl);
+    } else {
+      row.appendChild(el('span', 'muted', 'Geen bestand'));
+    }
+
+    list.appendChild(row);
+  });
 }
 
 function renderCart() {
@@ -354,12 +421,13 @@ function currentRoute() {
   if (h.startsWith('#/product/')) return { view: 'product', id: decodeURIComponent(h.slice('#/product/'.length)) };
   if (h === '#/shop') return { view: 'shop' };
   if (h === '#/cart') return { view: 'cart' };
+  if (h === '#/account') return { view: 'account' };
   return { view: 'home' };
 }
 
 function render() {
   const route = currentRoute();
-  ['home', 'shop', 'product', 'cart'].forEach((v) => $(`view-${v}`).classList.toggle('hidden', v !== route.view));
+  ['home', 'shop', 'product', 'cart', 'account'].forEach((v) => $(`view-${v}`).classList.toggle('hidden', v !== route.view));
   document.querySelectorAll('.topnav a[data-view]').forEach((a) => {
     a.classList.toggle('active', a.dataset.view === (route.view === 'product' ? 'shop' : route.view));
   });
@@ -368,6 +436,7 @@ function render() {
   if (route.view === 'shop') renderShop();
   if (route.view === 'product') renderProduct(route.id);
   if (route.view === 'cart') renderCart();
+  if (route.view === 'account') renderAccount();
 }
 
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
@@ -392,6 +461,7 @@ $('checkoutBtn').addEventListener('click', async () => {
     state.cart = state.cart.filter((id) => !ids.includes(id));
     saveCart();
     try { ({ productIds: state.ownedIds } = await api('GET', `/store/my-purchases/${state.guildId}`)); } catch { /* laat staan */ }
+    state.orders = null; // volgende bezoek aan "Mijn aankopen" opnieuw ophalen
     showBanner('Gelukt! Je bestand is onderweg per privébericht (DM) van de Aurex-bot. Kom je niets binnen, controleer dan of je DM\'s van serverleden hebt toegestaan — je kunt het bestand ook hier downloaden.', 'success');
     btn.disabled = false;
     btn.textContent = 'Afrekenen';

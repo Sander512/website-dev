@@ -24,8 +24,10 @@
     <div class="topbar-actions">
       <a id="loginBtn" class="btn btn-discord btn-small hidden" href="#">Inloggen met Discord</a>
       <div id="userBox" class="userbox hidden">
-        <span id="userAvatar" class="avatar"></span>
-        <span id="userName" class="user-name"></span>
+        <a id="accountLink" href="#/account" class="userbox-link">
+          <span id="userAvatar" class="avatar"></span>
+          <span id="userName" class="user-name"></span>
+        </a>
         <button id="logoutBtn" class="btn btn-ghost btn-small">Uitloggen</button>
       </div>
       <a href="#/cart" class="cart-link" aria-label="Winkelwagen">
@@ -42,18 +44,51 @@
   <!-- HOME -->
   <section id="view-home">
     <div class="hero">
-      <p class="hero-kicker">$ /product-add</p>
-      <h1>Scripts en templates<br />voor je Discord.</h1>
-      <p class="hero-sub">
-        Kies wat je nodig hebt, reken veilig af via Stripe en krijg automatisch een DM
-        zodra er een nieuwe versie is van wat je gekocht hebt.
-      </p>
-      <div class="hero-pills">
-        <span class="pill">Direct geleverd</span>
-        <span class="pill">Update-DM's</span>
-        <span class="pill">Veilig via Stripe</span>
+      <div class="hero-glow" aria-hidden="true"></div>
+
+      <div class="hero-copy">
+        <h1>De officiële webshop van Aurex Development</h1>
+        <p class="hero-sub">
+          Bots, scripts en templates, klaar om direct te gebruiken. Je rekent veilig af via
+          Stripe en krijgt je bestand meteen daarna in je DM's — inclusief een berichtje
+          zodra er een nieuwe versie is.
+        </p>
+        <div class="hero-actions">
+          <a href="#/shop" class="btn btn-primary hero-cta">Bekijk de shop</a>
+          <a href="#/account" class="link hero-secondary">Mijn aankopen bekijken →</a>
+        </div>
       </div>
-      <a href="#/shop" class="btn btn-primary hero-cta">Bekijk de shop</a>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="mock-card">
+          <div class="mock-thumb"></div>
+          <div class="mock-line mock-line-title"></div>
+          <div class="mock-line mock-line-sub"></div>
+          <div class="mock-foot">
+            <span class="mock-price">€19,99</span>
+            <span class="mock-btn">In winkelwagen</span>
+          </div>
+        </div>
+        <div class="mock-card mock-card-back"></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature">
+        <span class="feature-icon">⚡</span>
+        <h3>Direct geleverd</h3>
+        <p>Je bestand staat meteen na aankoop klaar in je DM's, geen wachttijd.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">🔒</span>
+        <h3>Veilig afrekenen</h3>
+        <p>Betalingen lopen via Stripe. Aurex ziet of bewaart nooit je kaartgegevens.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">🔔</span>
+        <h3>Automatische updates</h3>
+        <p>Nieuwe versie uitgebracht? Je krijgt vanzelf een DM met het bijgewerkte bestand.</p>
+      </div>
     </div>
 
     <div class="section-head">
@@ -102,6 +137,13 @@
     <div id="productDetail"></div>
   </section>
 
+  <!-- ACCOUNT -->
+  <section id="view-account" class="hidden">
+    <h1 class="page-title">Mijn aankopen</h1>
+    <div id="accountList" class="order-list"></div>
+    <p id="accountEmpty" class="muted hidden">Je hebt nog niets gekocht. <a href="#/shop" class="link">Bekijk de shop</a>.</p>
+  </section>
+
   <!-- CART -->
   <section id="view-cart" class="hidden">
     <h1 class="page-title">Winkelwagen</h1>
@@ -115,7 +157,12 @@
   </section>
 </main>
 
-<footer class="footer">© Aurex | Development</footer>
+<footer class="footer">
+  <div class="footer-inner">
+    <span class="brand footer-brand"><span class="brand-mark">⚡</span> AUREX</span>
+    <span class="muted">© Aurex | Development — digitale producten voor Discord</span>
+  </div>
+</footer>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
