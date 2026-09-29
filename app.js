@@ -167,15 +167,61 @@ function productCard(p) {
 }
 
 // ---------- views ----------
+let heroSellerLoaded = false;
+
+async function renderHeroSeller() {
+  const box = $('heroSeller');
+  if (!box || heroSellerLoaded) return;
+  heroSellerLoaded = true;
+
+  let product = null;
+  let sales = 0;
+  try {
+    ({ product, sales } = await api('GET', `/store/top-seller/${state.guildId}`));
+  } catch {
+    heroSellerLoaded = false; // opnieuw proberen bij de volgende renderHome()
+    return;
+  }
+  if (!product) return;
+
+  const goto = () => { location.hash = `#/product/${encodeURIComponent(product.id)}`; };
+
+  const back = el('div', 'seller-card seller-card-back');
+
+  const card = el('a', 'seller-card');
+  card.href = `#/product/${encodeURIComponent(product.id)}`;
+  card.addEventListener('click', (e) => { e.preventDefault(); goto(); });
+
+  const thumb = el('div', 'seller-thumb');
+  thumb.appendChild(product.imageUrls[0] ? imageEl(product.imageUrls[0], product.name) : placeholder(product.name));
+  card.appendChild(thumb);
+
+  const tagRow = el('div', 'seller-tag');
+  tagRow.appendChild(el('span', null, sales > 0 ? 'Bestseller' : 'Uitgelicht'));
+  card.appendChild(tagRow);
+
+  card.appendChild(el('div', 'seller-name', product.name));
+
+  const foot = el('div', 'seller-foot');
+  foot.appendChild(el('span', 'seller-price', formatPrice(product.priceCents, product.currency)));
+  foot.appendChild(el('span', 'btn btn-primary btn-small', 'Bekijk'));
+  card.appendChild(foot);
+
+  box.textContent = '';
+  box.appendChild(back);
+  box.appendChild(card);
+}
+
 function renderHome() {
   const grid = $('homeGrid');
   grid.textContent = '';
   const latest = state.products.slice(0, 4);
   if (latest.length === 0) {
     grid.appendChild(el('p', 'muted', 'Er staan nog geen producten in de shop.'));
-    return;
+  } else {
+    latest.forEach((p) => grid.appendChild(productCard(p)));
   }
-  latest.forEach((p) => grid.appendChild(productCard(p)));
+  renderHeroSeller();
 }
 
 function visibleProducts() {
