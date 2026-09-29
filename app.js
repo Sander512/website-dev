@@ -95,6 +95,7 @@ function loginErrorMessage(code) {
     access_denied: 'Je hebt het inloggen geannuleerd.',
     invalid_state: 'Inloggen mislukt: de beveiligingscode klopte niet. Sta cookies toe en probeer het opnieuw (niet te lang wachten op de Discord-pagina).',
     token_exchange_failed: 'Inloggen mislukt: Discord weigerde de aanvraag. De beheerder moet DISCORD_CLIENT_SECRET en de redirect-URL in Discord controleren.',
+    rate_limited: 'Discord is op dit moment tijdelijk overbelast. Wacht een paar minuten en probeer opnieuw in te loggen.',
   };
   return messages[code] || `Inloggen met Discord is mislukt (${code}).`;
 }
