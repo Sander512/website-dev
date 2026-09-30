@@ -407,10 +407,12 @@ async function renderAccount() {
     info.appendChild(el('div', 'muted order-meta', metaBits.join(' · ')));
     row.appendChild(info);
 
-    if (o.hasFile) {
+    if (o.hasFile && o.stillListed) {
       const dl = el('a', 'btn btn-light btn-small', 'Download');
       dl.href = `${API_BASE}/store/download/${encodeURIComponent(o.id)}`;
       row.appendChild(dl);
+    } else if (!o.stillListed) {
+      row.appendChild(el('span', 'muted', 'Niet meer beschikbaar'));
     } else {
       row.appendChild(el('span', 'muted', 'Geen bestand'));
     }
