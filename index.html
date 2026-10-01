@@ -19,6 +19,7 @@
     <nav class="topnav">
       <a href="#/" data-view="home">Home</a>
       <a href="#/shop" data-view="shop">Shop</a>
+      <a href="#/reviews" data-view="reviews">Reviews</a>
       <a id="joinBtn" href="#" target="_blank" rel="noopener" class="hidden">Discord</a>
     </nav>
 
@@ -81,6 +82,8 @@
       </div>
     </div>
 
+    <div id="homeBundles" class="bundle-section hidden"></div>
+
     <div class="section-head">
       <h2 class="section-title">Nieuwste producten</h2>
       <a href="#/shop" class="link">Alles bekijken →</a>
@@ -102,6 +105,8 @@
         <input id="searchInput" type="search" placeholder="Zoek producten..." />
       </div>
     </div>
+
+    <div id="shopBundles" class="bundle-section hidden"></div>
 
     <div class="shop-layout">
       <aside class="filters">
@@ -127,6 +132,13 @@
     <div id="productDetail"></div>
   </section>
 
+  <!-- REVIEWS -->
+  <section id="view-reviews" class="hidden">
+    <h1 class="page-title">Reviews</h1>
+    <p class="muted reviews-intro">Eerlijke reviews van echte kopers. Alleen wie een product heeft gekocht kan een review schrijven — dat doe je via <a href="#/account" class="link">Mijn aankopen</a>.</p>
+    <div id="reviewsBody"></div>
+  </section>
+
   <!-- ACCOUNT -->
   <section id="view-account" class="hidden">
     <h1 class="page-title">Mijn aankopen</h1>
@@ -139,6 +151,12 @@
     <h1 class="page-title">Winkelwagen</h1>
     <div id="cartList" class="cart-list"></div>
     <div id="cartFooter" class="cart-footer hidden">
+      <div class="cart-code">
+        <input id="codeInput" type="text" maxlength="40" placeholder="Kortingscode" autocomplete="off" />
+        <button id="codeApply" class="btn btn-ghost btn-small" type="button">Toepassen</button>
+      </div>
+      <div id="codeMsg" class="code-msg"></div>
+      <div id="cartSummary" class="cart-summary"></div>
       <div class="cart-total"><span class="muted">Totaal</span> <strong id="cartTotal"></strong></div>
       <button id="checkoutBtn" class="btn btn-primary">Afrekenen</button>
       <a id="checkoutLogin" class="btn btn-discord hidden" href="#">Log in om af te rekenen</a>
