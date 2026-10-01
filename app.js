@@ -10,6 +10,7 @@ const CART_KEY = 'aurexShopCart';
 const state = {
   guildId: '',
   user: null,
+  authChecked: false, // true zodra bekend is of je wel/niet bent ingelogd
   products: [], // nieuwste eerst
   ownedIds: [],
   orders: null,
@@ -88,11 +89,27 @@ function saveCart() {
 function isOwned(id) { return state.ownedIds.includes(id); }
 function inCart(id) { return state.cart.includes(id); }
 
+// Iets in de winkelwagen stoppen terwijl je niet bent ingelogd: de wagen wordt
+// bewaard en je gaat meteen naar de Discord-login. Na het inloggen kom je
+// direct in je winkelwagen uit (zie het opstartstuk onderaan).
+const AFTER_LOGIN_KEY = 'aurexShopAfterLogin';
+
+function needsLogin() {
+  return state.authChecked && !state.user;
+}
+
+function goToLogin() {
+  try { sessionStorage.setItem(AFTER_LOGIN_KEY, '#/cart'); } catch { /* niet erg */ }
+  location.href = loginUrl();
+}
+
 function toggleCart(id) {
   const i = state.cart.indexOf(id);
-  if (i >= 0) state.cart.splice(i, 1);
-  else state.cart.push(id);
+  const adding = i < 0;
+  if (adding) state.cart.push(id);
+  else state.cart.splice(i, 1);
   saveCart();
+  if (adding && needsLogin()) return goToLogin();
   render();
 }
 
@@ -412,6 +429,7 @@ function bundleCard(b) {
       if (allInCart) { location.hash = '#/cart'; return; }
       b.products.forEach((x) => { if (!state.cart.includes(x.id)) state.cart.push(x.id); });
       saveCart();
+      if (needsLogin()) return goToLogin();
       render();
     });
     foot.appendChild(btn);
@@ -712,6 +730,11 @@ function buildGallery(p) {
     if (multi) {
       counter.textContent = `${index + 1} / ${images.length}`;
       thumbButtons.forEach((b, n) => b.classList.toggle('active', n === index));
+      // Bij veel foto's: de actieve thumbnail binnen de (scrollbare) kolom houden.
+      const t = thumbButtons[index];
+      const c = t.parentElement;
+      if (c.scrollHeight > c.clientHeight + 1) c.scrollTop = t.offsetTop - c.clientHeight / 2 + t.offsetHeight / 2;
+      if (c.scrollWidth > c.clientWidth + 1) c.scrollLeft = t.offsetLeft - c.clientWidth / 2 + t.offsetWidth / 2;
       preload(images[(index + 1) % images.length]);
       preload(images[(index - 1 + images.length) % images.length]);
     }
@@ -1119,6 +1142,7 @@ $('logoutBtn').addEventListener('click', async () => {
   }
 
   try { state.user = await api('GET', '/auth/me'); } catch { state.user = null; }
+  state.authChecked = true;
   renderUser();
 
   if (!state.guildId) {
@@ -1138,6 +1162,15 @@ $('logoutBtn').addEventListener('click', async () => {
   if (state.user) {
     try { ({ productIds: state.ownedIds } = await api('GET', `/store/my-purchases/${state.guildId}`)); } catch { state.ownedIds = []; }
   }
+
+  // Net ingelogd nadat je iets in de wagen deed? Dan meteen naar de winkelwagen.
+  try {
+    const dest = sessionStorage.getItem(AFTER_LOGIN_KEY);
+    if (dest) {
+      sessionStorage.removeItem(AFTER_LOGIN_KEY);
+      if (state.user && !params.get('login_error')) location.hash = dest;
+    }
+  } catch { /* sessionStorage niet beschikbaar */ }
 
   // Verdwenen/inactieve producten uit een oude winkelwagen halen.
   state.cart = state.cart.filter((id) => state.products.some((p) => p.id === id));

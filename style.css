@@ -362,3 +362,10 @@ body.no-scroll { overflow: hidden; }
   border-radius: 10px; padding: 9px 12px; font: inherit; outline: none;
 }
 .cart-code input:focus, .review-form textarea:focus { border-color: var(--accent); }
+
+/* ---- Veel foto's (tot 15): thumbnails scrollen naast/onder de hoofdfoto ---- */
+.thumbs { position: relative; align-self: stretch; contain: size; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding-right: 2px; }
+.thumbs button { flex-shrink: 0; }
+@media (max-width: 720px) {
+  .thumbs { contain: none; align-self: auto; overflow-x: auto; overflow-y: hidden; padding: 0 0 6px; }
+}
