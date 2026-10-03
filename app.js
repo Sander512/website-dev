@@ -62,6 +62,38 @@ function imageEl(url, alt) {
   return img;
 }
 
+// Galerij-items: [{ type: 'image'|'video', url }]. Valt terug op imageUrls als de
+// API (nog) geen "media" meestuurt.
+function mediaOf(p) {
+  if (p && Array.isArray(p.media) && p.media.length) return p.media;
+  return ((p && p.imageUrls) || []).map((url) => ({ type: 'image', url }));
+}
+
+// Video: stilstaand eerste beeld (#t=0.1 zodat Safari het ook toont). Met
+// controls=true is het een echte speler (hoofdweergave en lightbox).
+function videoEl(url, alt, controls) {
+  const v = document.createElement('video');
+  v.src = controls ? url : `${url}#t=0.1`;
+  v.preload = 'metadata';
+  v.playsInline = true;
+  v.setAttribute('aria-label', alt || 'Video');
+  if (controls) v.controls = true;
+  else v.muted = true;
+  return v;
+}
+
+function mediaEl(item, alt, controls) {
+  return item.type === 'video' ? videoEl(item.url, alt, controls) : imageEl(item.url, alt);
+}
+
+// Afbeelding voor kaarten/lijsten: de cover-foto; heeft een product alleen een
+// video, dan het eerste beeld daarvan.
+function coverEl(p) {
+  if (p.imageUrls && p.imageUrls[0]) return imageEl(p.imageUrls[0], p.name);
+  const video = mediaOf(p).find((m) => m.type === 'video');
+  return video ? videoEl(video.url, p.name, false) : placeholder(p.name);
+}
+
 function placeholder(name) {
   return el('div', 'thumb-placeholder', (name || '?').trim().charAt(0).toUpperCase());
 }
@@ -459,7 +491,7 @@ function productCard(p) {
 
   const thumb = el('a', 'product-thumb');
   thumb.addEventListener('click', goto);
-  thumb.appendChild(p.imageUrls[0] ? imageEl(p.imageUrls[0], p.name) : placeholder(p.name));
+  thumb.appendChild(coverEl(p));
   // Tweede foto verschijnt als je er met de muis overheen gaat.
   if (p.imageUrls[1]) {
     const alt = imageEl(p.imageUrls[1], `${p.name} 2`);
@@ -473,6 +505,7 @@ function productCard(p) {
   if (p.priceCents === 0) badges.appendChild(el('span', 'badge badge-free', 'Gratis'));
   else if (p.isBestseller) badges.appendChild(el('span', 'badge badge-hot', '🏆 Bestseller'));
   if (p.createdAt && Date.now() - p.createdAt < NEW_DAYS * 86400000) badges.appendChild(el('span', 'badge badge-new', 'Nieuw'));
+  if (mediaOf(p).some((m) => m.type === 'video')) badges.appendChild(el('span', 'badge badge-video', '▶ Video'));
   if (badges.childNodes.length) thumb.appendChild(badges);
   card.appendChild(thumb);
 
@@ -528,7 +561,7 @@ async function renderHeroSeller() {
   card.addEventListener('click', (e) => { e.preventDefault(); goto(); });
 
   const thumb = el('div', 'seller-thumb');
-  thumb.appendChild(product.imageUrls[0] ? imageEl(product.imageUrls[0], product.name) : placeholder(product.name));
+  thumb.appendChild(coverEl(product));
   card.appendChild(thumb);
 
   const tagRow = el('div', 'seller-tag');
@@ -624,13 +657,16 @@ function renderShop() {
 function arrowButton(dir) {
   const b = el('button', `gallery-arrow ${dir}`, dir === 'prev' ? '‹' : '›');
   b.type = 'button';
-  b.setAttribute('aria-label', dir === 'prev' ? 'Vorige foto' : 'Volgende foto');
+  b.setAttribute('aria-label', dir === 'prev' ? 'Vorige' : 'Volgende');
   return b;
 }
 
 function onSwipe(node, handler) {
   let startX = null;
-  node.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+  node.addEventListener('touchstart', (e) => {
+    // Op een video veegt je om te spoelen; dan niet van dia wisselen.
+    startX = e.target.closest && e.target.closest('video') ? null : e.touches[0].clientX;
+  }, { passive: true });
   node.addEventListener('touchend', (e) => {
     if (startX === null) return;
     const dx = e.changedTouches[0].clientX - startX;
@@ -639,13 +675,13 @@ function onSwipe(node, handler) {
   }, { passive: true });
 }
 
-function preload(url) {
-  if (url) new Image().src = url;
+function preload(item) {
+  if (item && item.type === 'image') new Image().src = item.url;
 }
 
 let lightboxEl = null;
 
-function openLightbox(images, startIndex, name, onChange) {
+function openLightbox(media, startIndex, name, onChange) {
   if (lightboxEl) return;
   let index = startIndex;
   const previouslyFocused = document.activeElement;
@@ -653,12 +689,9 @@ function openLightbox(images, startIndex, name, onChange) {
   const box = el('div', 'lightbox');
   box.setAttribute('role', 'dialog');
   box.setAttribute('aria-modal', 'true');
-  box.setAttribute('aria-label', `Foto's van ${name}`);
+  box.setAttribute('aria-label', `Foto's en video's van ${name}`);
 
   const stage = el('div', 'lightbox-stage');
-  const img = document.createElement('img');
-  img.alt = name;
-  stage.appendChild(img);
 
   const closeBtn = el('button', 'lightbox-close', '✕');
   closeBtn.type = 'button';
@@ -668,20 +701,22 @@ function openLightbox(images, startIndex, name, onChange) {
   const next = arrowButton('next');
 
   const render = () => {
-    img.src = images[index];
-    counter.textContent = `${index + 1} / ${images.length}`;
-    preload(images[(index + 1) % images.length]);
-    preload(images[(index - 1 + images.length) % images.length]);
+    stage.textContent = ''; // een video die speelde stopt hiermee
+    stage.appendChild(mediaEl(media[index], name, true));
+    counter.textContent = `${index + 1} / ${media.length}`;
+    preload(media[(index + 1) % media.length]);
+    preload(media[(index - 1 + media.length) % media.length]);
     onChange(index);
   };
   const go = (d) => {
-    index = (index + d + images.length) % images.length;
+    index = (index + d + media.length) % media.length;
     render();
   };
 
   const close = () => {
     document.removeEventListener('keydown', onKey);
     document.body.classList.remove('no-scroll');
+    stage.textContent = '';
     box.remove();
     lightboxEl = null;
     if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
@@ -690,6 +725,7 @@ function openLightbox(images, startIndex, name, onChange) {
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'ArrowRight') go(1);
+    else if (e.key === ' ' && e.target.tagName !== 'VIDEO') e.preventDefault();
   };
 
   prev.addEventListener('click', (e) => { e.stopPropagation(); go(-1); });
@@ -699,7 +735,7 @@ function openLightbox(images, startIndex, name, onChange) {
   onSwipe(stage, go);
 
   box.append(closeBtn, stage, counter);
-  if (images.length > 1) box.append(prev, next);
+  if (media.length > 1) box.append(prev, next);
   document.body.appendChild(box);
   document.body.classList.add('no-scroll');
   document.addEventListener('keydown', onKey);
@@ -709,47 +745,63 @@ function openLightbox(images, startIndex, name, onChange) {
 }
 
 function buildGallery(p) {
-  const images = p.imageUrls || [];
-  const multi = images.length > 1;
+  const media = mediaOf(p);
+  const multi = media.length > 1;
   const gallery = el('div', `gallery${multi ? '' : ' single'}`);
   const main = el('div', 'main-image');
   let index = 0;
   const thumbButtons = [];
 
   const show = (i) => {
-    index = (i + images.length) % Math.max(images.length, 1);
-    main.querySelectorAll('.main-photo, .thumb-placeholder').forEach((n) => n.remove());
-    if (images[index]) {
-      const img = imageEl(images[index], `${p.name} ${index + 1}`);
-      img.loading = 'eager';
-      img.classList.add('main-photo');
-      main.insertBefore(img, main.firstChild);
+    index = (i + media.length) % Math.max(media.length, 1);
+    main.querySelectorAll('.main-photo, .thumb-placeholder').forEach((n) => {
+      if (n.tagName === 'VIDEO') n.pause();
+      n.remove();
+    });
+    const item = media[index];
+    const isVideo = !!item && item.type === 'video';
+    main.classList.toggle('has-video', isVideo);
+    // Een foto opent bij een klik de lightbox; een video heeft zijn eigen bediening.
+    main.classList.toggle('zoomable', !!item && !isVideo);
+    if (item && !isVideo) {
+      main.setAttribute('role', 'button');
+      main.tabIndex = 0;
+    } else {
+      main.removeAttribute('role');
+      main.tabIndex = -1;
+    }
+    if (item) {
+      const node = mediaEl(item, `${p.name} ${index + 1}`, true);
+      if (!isVideo) node.loading = 'eager';
+      node.classList.add('main-photo');
+      main.insertBefore(node, main.firstChild);
     } else {
       main.insertBefore(placeholder(p.name), main.firstChild);
     }
     if (multi) {
-      counter.textContent = `${index + 1} / ${images.length}`;
+      counter.textContent = `${index + 1} / ${media.length}`;
       thumbButtons.forEach((b, n) => b.classList.toggle('active', n === index));
       // Bij veel foto's: de actieve thumbnail binnen de (scrollbare) kolom houden.
       const t = thumbButtons[index];
       const c = t.parentElement;
       if (c.scrollHeight > c.clientHeight + 1) c.scrollTop = t.offsetTop - c.clientHeight / 2 + t.offsetHeight / 2;
       if (c.scrollWidth > c.clientWidth + 1) c.scrollLeft = t.offsetLeft - c.clientWidth / 2 + t.offsetWidth / 2;
-      preload(images[(index + 1) % images.length]);
-      preload(images[(index - 1 + images.length) % images.length]);
+      preload(media[(index + 1) % media.length]);
+      preload(media[(index - 1 + media.length) % media.length]);
     }
   };
 
   const counter = el('div', 'gallery-counter');
 
-  if (images.length > 0) {
-    main.classList.add('zoomable');
-    main.setAttribute('role', 'button');
-    main.tabIndex = 0;
+  if (media.length > 0) {
     main.setAttribute('aria-label', 'Foto vergroten');
-    const open = () => openLightbox(images, index, p.name, (i) => { if (i !== index) show(i); });
+    const open = () => {
+      if (media[index].type !== 'image') return;
+      openLightbox(media, index, p.name, (i) => { if (i !== index) show(i); });
+    };
     main.addEventListener('click', open);
     main.addEventListener('keydown', (e) => {
+      if (e.target !== main) return; // toetsen op de videospeler laten we met rust
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
       else if (multi && e.key === 'ArrowLeft') show(index - 1);
       else if (multi && e.key === 'ArrowRight') show(index + 1);
@@ -765,11 +817,12 @@ function buildGallery(p) {
     onSwipe(main, (d) => show(index + d));
 
     const thumbs = el('div', 'thumbs');
-    images.forEach((url, i) => {
+    media.forEach((item, i) => {
       const b = el('button', i === 0 ? 'active' : '');
       b.type = 'button';
-      b.setAttribute('aria-label', `Foto ${i + 1}`);
-      b.appendChild(imageEl(url, `${p.name} ${i + 1}`));
+      b.setAttribute('aria-label', `${item.type === 'video' ? 'Video' : 'Foto'} ${i + 1}`);
+      b.appendChild(mediaEl(item, `${p.name} ${i + 1}`, false));
+      if (item.type === 'video') b.appendChild(el('span', 'thumb-play', '▶'));
       b.addEventListener('click', () => show(i));
       thumbs.appendChild(b);
       thumbButtons.push(b);
@@ -967,7 +1020,7 @@ function renderCart(skipQuote) {
   items.forEach((p) => {
     const row = el('div', 'cart-item');
     const thumb = el('div', 'cart-thumb');
-    thumb.appendChild(p.imageUrls[0] ? imageEl(p.imageUrls[0], p.name) : placeholder(p.name));
+    thumb.appendChild(coverEl(p));
     row.appendChild(thumb);
 
     const info = el('div', 'cart-item-info');
