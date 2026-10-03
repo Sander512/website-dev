@@ -394,3 +394,6 @@ body.no-scroll { overflow: hidden; }
 @media (max-width: 720px) {
   .thumbs { contain: none; align-self: auto; overflow-x: auto; overflow-y: hidden; padding: 0 0 6px; }
 }
+
+/* Kaart met alleen een video: donker vlak tot het eerste beeld er is, zachte overgang bij afspelen. */
+.product-thumb video.preview-video { background: #0c0d11; }

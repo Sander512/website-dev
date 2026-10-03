@@ -81,10 +81,12 @@ function mediaOf(p) {
 
 // Video: stilstaand eerste beeld (#t=0.1 zodat Safari het ook toont). Met
 // controls=true is het een echte speler (hoofdweergave en lightbox).
-function videoEl(url, alt, controls) {
+function videoEl(url, alt, controls, poster) {
   const v = document.createElement('video');
   v.src = controls ? url : `${url}#t=0.1`;
-  v.preload = 'metadata';
+  // "auto" i.p.v. "metadata": anders blijft het beeld zwart/leeg tot je afspeelt.
+  v.preload = 'auto';
+  if (poster) v.poster = poster;
   v.playsInline = true;
   v.setAttribute('aria-label', alt || 'Video');
   if (controls) v.controls = true;
@@ -92,8 +94,8 @@ function videoEl(url, alt, controls) {
   return v;
 }
 
-function mediaEl(item, alt, controls) {
-  return item.type === 'video' ? videoEl(item.url, alt, controls) : imageEl(item.url, alt);
+function mediaEl(item, alt, controls, poster) {
+  return item.type === 'video' ? videoEl(item.url, alt, controls, poster) : imageEl(item.url, alt);
 }
 
 // Afbeelding voor kaarten/lijsten: de cover-foto; heeft een product alleen een
@@ -101,7 +103,55 @@ function mediaEl(item, alt, controls) {
 function coverEl(p, eager) {
   if (p.imageUrls && p.imageUrls[0]) return imageEl(p.imageUrls[0], p.name, eager);
   const video = mediaOf(p).find((m) => m.type === 'video');
-  return video ? videoEl(video.url, p.name, false) : placeholder(p.name);
+  return video ? previewVideoEl(video.url, p.name) : placeholder(p.name);
+}
+
+// Kaart-/lijstvideo: laadt pas als hij bijna in beeld komt en toont dan het
+// eerste beeld. Afspelen doet wirePreviewHover() bij de muis-over.
+function previewVideoEl(url, alt) {
+  const v = document.createElement('video');
+  v.muted = true;
+  v.defaultMuted = true;
+  v.loop = true;
+  v.playsInline = true;
+  v.setAttribute('muted', '');
+  v.setAttribute('playsinline', '');
+  v.disablePictureInPicture = true;
+  v.preload = 'none';
+  v.setAttribute('aria-label', alt || 'Video');
+  v.className = 'preview-video';
+
+  let loaded = false;
+  v.aurexLoad = () => {
+    if (loaded) return;
+    loaded = true;
+    v.preload = 'auto';
+    v.src = `${url}#t=0.1`;
+  };
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { v.aurexLoad(); io.disconnect(); }
+    }, { rootMargin: '300px' });
+    io.observe(v);
+  } else {
+    v.aurexLoad();
+  }
+  return v;
+}
+
+// Muis op de kaart = video afspelen (zonder geluid); muis weg = terug naar het eerste beeld.
+function wirePreviewHover(card, v) {
+  card.addEventListener('mouseenter', () => {
+    v.aurexLoad();
+    card.classList.add('is-previewing');
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {});
+  });
+  card.addEventListener('mouseleave', () => {
+    card.classList.remove('is-previewing');
+    v.pause();
+    try { v.currentTime = 0.1; } catch { /* nog niet geladen */ }
+  });
 }
 
 // Video voor de homepage-hero: speelt stil (zonder geluid) in een lus af, met de
@@ -539,7 +589,9 @@ function productCard(p) {
 
   const thumb = el('a', 'product-thumb');
   thumb.addEventListener('click', goto);
-  thumb.appendChild(coverEl(p));
+  const cover = coverEl(p);
+  thumb.appendChild(cover);
+  if (cover.tagName === 'VIDEO') wirePreviewHover(card, cover);
   // Tweede foto verschijnt als je er met de muis overheen gaat.
   if (p.imageUrls[1]) {
     const alt = imageEl(p.imageUrls[1], `${p.name} 2`);
@@ -840,7 +892,7 @@ function buildGallery(p) {
       main.tabIndex = -1;
     }
     if (item) {
-      const node = mediaEl(item, `${p.name} ${index + 1}`, true);
+      const node = mediaEl(item, `${p.name} ${index + 1}`, true, p.imageUrls && p.imageUrls[0]);
       if (!isVideo) node.loading = 'eager';
       node.classList.add('main-photo');
       main.insertBefore(node, main.firstChild);
