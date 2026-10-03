@@ -6,15 +6,29 @@
 <title>Aurex | Development — Shop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
 <link rel="stylesheet" href="style.css" />
-<link rel="icon" type="image/png" href="logo.png" />
+<link rel="icon" type="image/png" href="logo-small.png" />
+<script src="config.js"></script>
+<script>
+// Alvast verbinding maken met de API (Render), zodat DNS/TLS al klaar zijn
+// als de eerste aanroep komt.
+(function () {
+  if (!window.AUREX_API_BASE) return;
+  var l = document.createElement('link');
+  l.rel = 'preconnect';
+  l.href = window.AUREX_API_BASE;
+  l.crossOrigin = 'use-credentials';
+  document.head.appendChild(l);
+})();
+</script>
 </head>
 <body>
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a href="#/" class="brand"><img src="logo.png" alt="" class="brand-mark" /> AUREX</a>
+    <a href="#/" class="brand"><img src="logo-small.png" alt="" class="brand-mark" width="26" height="26" /> AUREX</a>
 
     <nav class="topnav">
       <a href="#/" data-view="home">Home</a>
@@ -61,7 +75,7 @@
         </div>
       </div>
 
-      <div id="heroSeller" class="hero-visual"></div>
+      <div id="heroSeller" class="hero-visual"><div class="seller-card skeleton"></div></div>
     </div>
 
     <div class="feature-row">
@@ -167,12 +181,11 @@
 
 <footer class="footer">
   <div class="footer-inner">
-    <span class="brand footer-brand"><img src="logo.png" alt="" class="brand-mark" /> AUREX</span>
+    <span class="brand footer-brand"><img src="logo-small.png" alt="" class="brand-mark" width="26" height="26" /> AUREX</span>
     <span class="muted">© Aurex | Development — digitale producten voor Discord</span>
   </div>
 </footer>
 
-<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

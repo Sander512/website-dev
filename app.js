@@ -10,6 +10,7 @@ const CART_KEY = 'aurexShopCart';
 const state = {
   guildId: '',
   user: null,
+  catalogLoaded: false, // true zodra producten (uit cache of van de API) bekend zijn
   authChecked: false, // true zodra bekend is of je wel/niet bent ingelogd
   products: [], // nieuwste eerst
   ownedIds: [],
@@ -26,12 +27,15 @@ const state = {
 
 // ---------- helpers ----------
 async function api(method, path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  // Content-Type alleen meesturen als er een body is: anders is een GET een
+  // "simpel" verzoek en slaat de browser de extra CORS-preflight (OPTIONS) over,
+  // wat elke aanroep naar de API een volledige roundtrip sneller maakt.
+  const opts = { method, credentials: 'include' };
+  if (body) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(`${API_BASE}${path}`, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
@@ -54,11 +58,17 @@ function el(tag, className, text) {
   return node;
 }
 
-function imageEl(url, alt) {
+function imageEl(url, alt, eager) {
   const img = document.createElement('img');
   img.src = url;
   img.alt = alt || '';
-  img.loading = 'lazy';
+  img.decoding = 'async';
+  if (eager) {
+    img.loading = 'eager';
+    img.fetchPriority = 'high';
+  } else {
+    img.loading = 'lazy';
+  }
   return img;
 }
 
@@ -88,10 +98,48 @@ function mediaEl(item, alt, controls) {
 
 // Afbeelding voor kaarten/lijsten: de cover-foto; heeft een product alleen een
 // video, dan het eerste beeld daarvan.
-function coverEl(p) {
-  if (p.imageUrls && p.imageUrls[0]) return imageEl(p.imageUrls[0], p.name);
+function coverEl(p, eager) {
+  if (p.imageUrls && p.imageUrls[0]) return imageEl(p.imageUrls[0], p.name, eager);
   const video = mediaOf(p).find((m) => m.type === 'video');
   return video ? videoEl(video.url, p.name, false) : placeholder(p.name);
+}
+
+// Video voor de homepage-hero: speelt stil (zonder geluid) in een lus af, met de
+// eerste foto als omslag zodat er direct iets te zien is terwijl de video laadt.
+// Pauzeert zodra hij uit beeld is; bij "minder beweging" of databesparing blijft
+// het bij het eerste beeld.
+function heroVideo(url, alt, poster) {
+  const v = document.createElement('video');
+  v.muted = true;
+  v.defaultMuted = true;
+  v.loop = true;
+  v.playsInline = true;
+  v.setAttribute('muted', '');
+  v.setAttribute('playsinline', '');
+  v.disablePictureInPicture = true;
+  v.setAttribute('aria-label', alt || 'Video');
+  if (poster) v.poster = poster;
+
+  const conn = navigator.connection;
+  const calm = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || !!(conn && conn.saveData);
+  if (calm) {
+    v.preload = 'metadata';
+    v.src = `${url}#t=0.1`;
+    return v;
+  }
+
+  v.preload = 'auto';
+  v.autoplay = true;
+  v.src = url;
+  const play = () => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) play(); else v.pause(); });
+    }, { threshold: 0.25 }).observe(v);
+  } else {
+    play();
+  }
+  return v;
 }
 
 function placeholder(name) {
@@ -535,21 +583,27 @@ function productCard(p) {
 }
 
 // ---------- views ----------
-let heroSellerLoaded = false;
+let heroKey = null;
 
-async function renderHeroSeller() {
+// Uitgelicht = de bestseller; zonder verkopen het nieuwste product. Komt uit de
+// productlijst die toch al geladen wordt, dus geen extra aanroep naar de API.
+function pickHeroProduct() {
+  if (!state.products.length) return null;
+  return state.products.find((p) => p.isBestseller) || state.products[0];
+}
+
+function renderHeroSeller() {
   const box = $('heroSeller');
-  if (!box || heroSellerLoaded) return;
-  heroSellerLoaded = true;
+  if (!box || !state.catalogLoaded) return; // tot dan blijft het laadskelet staan
 
-  let product = null;
-  let sales = 0;
-  try {
-    ({ product, sales } = await api('GET', `/store/top-seller/${state.guildId}`));
-  } catch {
-    heroSellerLoaded = false; // opnieuw proberen bij de volgende renderHome()
-    return;
-  }
+  const product = pickHeroProduct();
+  const key = product
+    ? [product.id, product.name, product.priceCents, product.currency, product.isBestseller, mediaOf(product).map((m) => m.url).join(',')].join('|')
+    : '';
+  if (key === heroKey) return; // niets veranderd: video niet opnieuw opbouwen
+  heroKey = key;
+
+  box.textContent = '';
   if (!product) return;
 
   const goto = () => { location.hash = `#/product/${encodeURIComponent(product.id)}`; };
@@ -561,11 +615,13 @@ async function renderHeroSeller() {
   card.addEventListener('click', (e) => { e.preventDefault(); goto(); });
 
   const thumb = el('div', 'seller-thumb');
-  thumb.appendChild(coverEl(product));
+  const video = mediaOf(product).find((m) => m.type === 'video');
+  if (video) thumb.appendChild(heroVideo(video.url, product.name, product.imageUrls && product.imageUrls[0]));
+  else thumb.appendChild(coverEl(product, true));
   card.appendChild(thumb);
 
   const tagRow = el('div', 'seller-tag');
-  tagRow.appendChild(el('span', null, sales > 0 ? 'Bestseller' : 'Uitgelicht'));
+  tagRow.appendChild(el('span', null, product.isBestseller ? 'Bestseller' : 'Uitgelicht'));
   card.appendChild(tagRow);
 
   card.appendChild(el('div', 'seller-name', product.name));
@@ -575,16 +631,23 @@ async function renderHeroSeller() {
   foot.appendChild(el('span', 'btn btn-primary btn-small', 'Bekijk'));
   card.appendChild(foot);
 
-  box.textContent = '';
   box.appendChild(back);
   box.appendChild(card);
+}
+
+function skeletonCards(n) {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) frag.appendChild(el('div', 'skeleton skeleton-card'));
+  return frag;
 }
 
 function renderHome() {
   const grid = $('homeGrid');
   grid.textContent = '';
   const latest = state.products.slice(0, 4);
-  if (latest.length === 0) {
+  if (!state.catalogLoaded) {
+    grid.appendChild(skeletonCards(4));
+  } else if (latest.length === 0) {
     grid.appendChild(el('p', 'muted', 'Er staan nog geen producten in de shop.'));
   } else {
     latest.forEach((p) => grid.appendChild(productCard(p)));
@@ -644,6 +707,12 @@ function renderShop() {
   const list = visibleProducts();
   const grid = $('productGrid');
   grid.textContent = '';
+  if (!state.catalogLoaded) {
+    grid.appendChild(skeletonCards(6));
+    $('emptyState').classList.add('hidden');
+    $('resultCount').textContent = '';
+    return;
+  }
   list.forEach((p) => grid.appendChild(productCard(p)));
   $('emptyState').classList.toggle('hidden', list.length > 0);
   $('emptyState').textContent = state.products.length === 0 ? 'Er staan nog geen producten in de shop.' : 'Geen producten gevonden met deze filters.';
@@ -840,7 +909,7 @@ function renderProduct(id) {
   box.textContent = '';
   const p = state.products.find((x) => x.id === id);
   if (!p) {
-    box.appendChild(el('p', 'muted', 'Dit product bestaat niet (meer).'));
+    box.appendChild(el('p', 'muted', state.catalogLoaded ? 'Dit product bestaat niet (meer).' : 'Laden...'));
     return;
   }
 
@@ -912,6 +981,10 @@ async function renderAccount() {
   list.textContent = '';
   $('accountEmpty').classList.add('hidden');
 
+  if (!state.authChecked) {
+    list.appendChild(el('p', 'muted', 'Laden...')); // inlogstatus nog onderweg; daarna wordt opnieuw getekend
+    return;
+  }
   if (!state.user) {
     location.hash = '#/';
     return;
@@ -1163,26 +1236,90 @@ $('logoutBtn').addEventListener('click', async () => {
   location.reload();
 });
 
+// ---------- snelle start ----------
+// De productlijst wordt bewaard in de browser: bij een volgend bezoek staat de
+// shop direct op het scherm (ook als de Render-server nog wakker moet worden) en
+// wordt hij daarna op de achtergrond ververst. Prijzen worden bij het afrekenen
+// altijd opnieuw door de server bepaald, dus een verouderde cache is onschadelijk.
+const CATALOG_KEY = 'aurexShopCatalog';
+const CATALOG_MAX_AGE = 24 * 60 * 60 * 1000;
+
+function readCatalogCache(guildId) {
+  try {
+    const c = JSON.parse(localStorage.getItem(CATALOG_KEY) || 'null');
+    if (c && c.guildId === guildId && Array.isArray(c.products) && Date.now() - c.ts < CATALOG_MAX_AGE) return c;
+  } catch { /* kapotte of ontbrekende cache */ }
+  return null;
+}
+
+function writeCatalogCache() {
+  try {
+    localStorage.setItem(CATALOG_KEY, JSON.stringify({ guildId: state.guildId, ts: Date.now(), products: state.products, bundles: state.bundles }));
+  } catch { /* opslag vol of niet beschikbaar */ }
+}
+
 // ---------- start ----------
 (async () => {
-  // Meteen tonen, zodat inloggen en navigatie nooit wachten op producten.
   renderCartCount();
   renderUser();
-  render();
 
   const params = new URLSearchParams(location.search);
+  const fromUrl = params.get('guild');
+  if (fromUrl) localStorage.setItem(GUILD_KEY, fromUrl);
 
-  let cfg = {};
-  try { cfg = await api('GET', '/store/config'); } catch { cfg = {}; }
+  // Beste gok voor de server-id, zodat producten al kunnen laden terwijl
+  // /store/config nog onderweg is.
+  const guess = fromUrl || localStorage.getItem(GUILD_KEY) || '';
+  state.guildId = guess;
+  const cached = guess ? readCatalogCache(guess) : null;
+  if (cached) {
+    state.products = cached.products;
+    state.bundles = cached.bundles || [];
+    state.catalogLoaded = true;
+  }
+  render(); // meteen tonen (uit cache of met laadskeletten)
 
+  const startCatalog = (gid) => {
+    state.guildId = gid;
+    if (!gid) return Promise.resolve();
+    return Promise.all([
+      api('GET', `/store/products/${gid}`),
+      api('GET', `/store/bundles/${gid}`).catch(() => ({ bundles: [] })),
+    ]).then(([{ products }, { bundles }]) => {
+      if (state.guildId !== gid) return; // intussen een andere server gekozen
+      state.products = [...products].reverse(); // API geeft oudste eerst; wij tonen nieuwste eerst
+      state.bundles = bundles || [];
+      state.catalogLoaded = true;
+      writeCatalogCache();
+      render();
+    }).catch((err) => {
+      if (state.guildId !== gid) return;
+      state.catalogLoaded = true;
+      if (!state.products.length) showBanner(`Kon producten niet laden: ${err.message}`, 'error');
+      render();
+    });
+  };
+
+  // Alles tegelijk starten i.p.v. na elkaar.
+  let catalogP = startCatalog(guess);
+  const cfgP = api('GET', '/store/config').catch(() => ({}));
+  const meP = api('GET', '/auth/me').catch(() => null);
+
+  const cfg = await cfgP;
   if (cfg.inviteUrl) {
     $('joinBtn').href = cfg.inviteUrl;
     $('joinBtn').classList.remove('hidden');
   }
 
-  const fromUrl = params.get('guild');
-  if (fromUrl) localStorage.setItem(GUILD_KEY, fromUrl);
-  state.guildId = fromUrl || cfg.guildId || localStorage.getItem(GUILD_KEY) || '';
+  const gid = fromUrl || cfg.guildId || guess;
+  if (gid !== guess) {
+    // De gok klopte niet: niet met producten van een andere server blijven staan.
+    state.products = [];
+    state.bundles = [];
+    state.catalogLoaded = false;
+    catalogP = startCatalog(gid);
+  }
+  if (gid) localStorage.setItem(GUILD_KEY, gid);
 
   if (params.get('success')) {
     state.cart = [];
@@ -1194,27 +1331,21 @@ $('logoutBtn').addEventListener('click', async () => {
     showBanner(loginErrorMessage(params.get('login_error')), 'error');
   }
 
-  try { state.user = await api('GET', '/auth/me'); } catch { state.user = null; }
+  state.user = await meP;
   state.authChecked = true;
   renderUser();
 
   if (!state.guildId) {
+    state.catalogLoaded = true;
+    render();
     showBanner('Deze shop is nog niet gekoppeld aan een server. Zet SHOP_GUILD_ID in de bot-instellingen.', 'error');
     return;
   }
 
-  try {
-    const { products } = await api('GET', `/store/products/${state.guildId}`);
-    state.products = [...products].reverse(); // API geeft oudste eerst; wij tonen nieuwste eerst
-  } catch (err) {
-    showBanner(`Kon producten niet laden: ${err.message}`, 'error');
-  }
-
-  try { ({ bundles: state.bundles } = await api('GET', `/store/bundles/${state.guildId}`)); } catch { state.bundles = []; }
-
-  if (state.user) {
-    try { ({ productIds: state.ownedIds } = await api('GET', `/store/my-purchases/${state.guildId}`)); } catch { state.ownedIds = []; }
-  }
+  const ownedP = state.user
+    ? api('GET', `/store/my-purchases/${state.guildId}`).then((r) => { state.ownedIds = r.productIds || []; }).catch(() => { state.ownedIds = []; })
+    : Promise.resolve();
+  await Promise.all([catalogP, ownedP]);
 
   // Net ingelogd nadat je iets in de wagen deed? Dan meteen naar de winkelwagen.
   try {
@@ -1226,7 +1357,9 @@ $('logoutBtn').addEventListener('click', async () => {
   } catch { /* sessionStorage niet beschikbaar */ }
 
   // Verdwenen/inactieve producten uit een oude winkelwagen halen.
-  state.cart = state.cart.filter((id) => state.products.some((p) => p.id === id));
-  saveCart();
+  if (state.catalogLoaded && state.products.length) {
+    state.cart = state.cart.filter((id) => state.products.some((p) => p.id === id));
+    saveCart();
+  }
   render();
 })();
