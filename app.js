@@ -986,7 +986,7 @@ function renderProduct(id) {
   }
 
   const pills = el('div', 'detail-pills');
-  ['Direct geleverd', 'Update-DM\'s', 'Veilig via Stripe'].forEach((t) => pills.appendChild(el('span', 'pill', t)));
+  ['Direct geleverd', 'Update-DM\'s', 'Veilig via Tebex'].forEach((t) => pills.appendChild(el('span', 'pill', t)));
   info.appendChild(pills);
 
   info.appendChild(el('p', 'detail-price', formatPrice(p.priceCents, p.currency)));

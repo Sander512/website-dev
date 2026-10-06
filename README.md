@@ -18,7 +18,7 @@ Statische webshop-pagina die los van de bot draait. Praat met je bot/API
 
 - `SHOP_ORIGIN=https://aurex-shop.vercel.app` (exact je Vercel-URL, geen `/` erachter)
 - Redeploy de bot. Dit zet CORS aan voor deze site, laat login-cookies
-  werken en stuurt Stripe/Discord terug naar deze site.
+  werken en stuurt Tebex/Discord terug naar deze site.
 
 ## Gebruik
 
